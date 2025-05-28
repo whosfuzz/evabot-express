@@ -1,0 +1,263 @@
+
+import dotenv from 'dotenv'
+dotenv.config()
+
+import cron from 'node-cron';
+
+import { Client, Events, GatewayIntentBits, ActivityType } from 'discord.js';
+import { Client as AppwriteClient, Users, Databases, Query, Permission, Role, ID } from 'node-appwrite';
+import { getRandomImage } from './imageUtils.js';
+
+import express from 'express';
+
+const app = express()
+const port = process.env.PORT || 3000
+
+let client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildPresences
+    ],
+  });
+
+let streamingMessages = {};
+
+const appwriteClient = new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY);
+const db = new Databases(appwriteClient);
+
+//  console.log('Task runs at 5:30 AM Mountain Time');
+cron.schedule('30 5 * * *', () => {
+  streamingMessages = {};
+}, { timezone: 'America/Denver'});
+
+async function handleInteraction(interaction) 
+{
+    let message = '';
+    try
+    {
+        if(!interaction.isCommand()) 
+        {
+            return;
+        }   
+        await interaction.deferReply({ flags: 64 });
+
+
+        const { commandName, user, options } = interaction;
+
+        //see if we exist
+        const selfRegistered = await db.listDocuments(
+            process.env.APPWRITE_DATABASE_ID,
+            process.env.APPWRITE_USERS_COLLECTION_ID,
+            [
+                Query.equal('discordUsername', [user.username])
+            ]
+        )
+
+        if(selfRegistered.documents.length === 0)
+        {
+            message = `Your account isn't registered. Click [here](https://discord.com/oauth2/authorize?response_type=code&client_id=1261843540665958531&state=%7B%22success%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22failure%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22token%22%3Afalse%7D&scope=identify+email&redirect_uri=https%3A%2F%2Ffra.cloud.appwrite.io%2Fv1%2Faccount%2Fsessions%2Foauth2%2Fcallback%2Fdiscord%2F669318be00330e837d7f) to get started`;
+            throw new Error(message);
+        }
+
+        if(commandName === 'create')
+        {
+            const result = await db.createDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, ID.unique(), 
+            {
+                folder: options.getString("folder").trim().toLowerCase(),
+                message: options.getString("message").trim().toLowerCase(),
+                seen: false, 
+                //discordUsername: user.username || ""
+            },
+            [
+                Permission.write(Role.user(selfRegistered.documents[0].$id))
+            ]
+            );
+            message = `Added '${options.getString("message").trim().toLowerCase()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
+        }
+    }
+    catch(error)
+    {
+        //message = "I can't show that!";
+        console.log(error);
+    }
+    finally
+    {
+        if(message === "")
+        {
+            message = "I can't show that!";
+        }
+        await interaction.editReply({
+            content: message,
+            flags: 64
+        });
+
+    }
+}
+
+async function evaFunction(channel, folder) {
+    let response = "";
+    
+    try {
+
+        const result = await db.listDocuments
+        (
+            process.env.APPWRITE_DATABASE_ID, 
+            process.env.APPWRITE_MESSAGES_COLLECTION_ID, 
+            [
+                Query.equal("folder", [`${folder}`]),
+                Query.orderAsc('$updatedAt'),
+                Query.limit(5)
+            ]
+        );
+
+        if(result.total === 0)
+        {
+            return 0;
+        }
+
+        const documents = result.documents;
+
+        const randomIndex = Math.floor(Math.random() * documents.length);
+        const randomDocument = documents[randomIndex];
+        const randomDocumentMessage = randomDocument.message;
+
+        await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, randomDocument.$id, 
+            {
+                folder: randomDocument.folder,
+                message: randomDocument.message,
+                seen: !randomDocument.seen
+            }
+        )
+
+        response = `${randomDocumentMessage}`;
+        await channel.send(`${response}`);
+        return 1;
+    }
+    catch(error) 
+    {
+        return 0;
+    }
+}
+
+async function showMe(split, channel)
+{
+    if (split.length > 1) 
+    {
+        const searchTerm = split[1].trim();
+        if (searchTerm.length > 0) 
+        {
+            const result = await evaFunction(channel, searchTerm);
+            
+            if (result === 0) 
+            {
+                try {
+                    const response = await getRandomImage(searchTerm);
+                    await channel.send(`${response}`);
+                } catch (error) {
+                    await channel.send("I can't show that!");
+                }
+            }
+        }
+    }
+}
+
+
+async function reset()
+{    
+    
+    client.on(Events.MessageCreate, async message => { 
+        if (message.author.bot) return;
+
+        if (message.content.toLowerCase().includes('show me an ') || message.content.toLowerCase().includes('show me the ')) 
+        {
+            const split = message.content.toLowerCase().split(/show me an |show me the /);
+            showMe(split, message.channel);
+        }
+        else if(message.content.toLowerCase().includes('show me a '))
+        {
+            const split = message.content.toLowerCase().split(/show me a /);
+            showMe(split, message.channel);
+        }
+        else if (message.content.toLowerCase().includes('show me ')) 
+        {
+            const split = message.content.toLowerCase().split(/show me /);
+            showMe(split, message.channel);
+        }
+        else if(message.content.toLowerCase().includes('eva'))
+        {
+            const evaMessage = await evaFunction(message.channel, "eva");
+        }
+    });
+        
+    client.on(Events.InteractionCreate, async interaction => {
+        if(!interaction.isCommand()) 
+        {
+            return;
+        }
+    
+        await handleInteraction(interaction);
+    });
+    
+    client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
+        try {
+            const user = newPresence.user;
+            const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
+        
+            if (!newPresence.guild || newPresence.guild.id !== guild.id) return;
+            if (user.bot) return;
+
+            const member = await guild.members.fetch(user.id);
+            const channel = await guild.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+        
+            if (!channel || !channel.isTextBased()) return;
+        
+            // Use optional chaining for newPresence and activities
+            const newActivity = newPresence?.activities?.find(
+                (a) => a.type === ActivityType.Streaming
+            );
+        
+            // Check if oldPresence is null before accessing activities
+            const oldActivity = oldPresence?.activities?.find(
+                (a) => a.type === ActivityType.Streaming
+            );
+        
+            const userId = user.id;
+        
+            // Check if newActivity exists
+            if (newActivity) {
+                const activityState = newActivity.state ? ` ${newActivity.state}` : '';
+                const activityDetails = newActivity.details ? ` ${newActivity.details}` : '';
+                const activityName = newActivity.name ? ` on ${newActivity.name}` : '';
+                const activityUrl = newActivity.url ? ` ${newActivity.url}` : '';
+
+                const messageToSend = `${member.displayName} is streaming${activityState}${activityDetails}${activityName}${activityUrl}`;
+
+                if(streamingMessages[userId] !== messageToSend)
+                {
+                    streamingMessages[userId] = messageToSend;
+                    await channel.send(messageToSend);
+                }
+            } 
+        } 
+        catch (error) 
+        {
+            console.error("Error in presenceUpdate:", error);
+        }
+    });
+
+    
+    await client.login(process.env.DISCORD_TOKEN);    
+}
+
+await reset();
+
+
+app.get('/', (req, res) => {
+    res.json(streamingMessages);
+});
+
+app.listen(port, () => {
+    console.log(`App is listening on port ${port}`);
+});
