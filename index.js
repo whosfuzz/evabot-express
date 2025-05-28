@@ -68,7 +68,7 @@ async function handleInteraction(interaction)
                 folder: options.getString("folder").trim().toLowerCase(),
                 message: options.getString("message").trim().toLowerCase(),
                 seen: false, 
-                //discordUsername: user.username || ""
+                createdBy: user.username
             },
             [
                 Permission.write(Role.user(selfRegistered.documents[0].$id))
@@ -80,7 +80,7 @@ async function handleInteraction(interaction)
     catch(error)
     {
         //message = "I can't show that!";
-        console.log(error);
+        //console.log(error);
     }
     finally
     {
@@ -101,6 +101,22 @@ async function evaFunction(channel, folder) {
     
     try {
 
+        const getTotal = await db.listDocuments
+        (
+            process.env.APPWRITE_DATABASE_ID, 
+            process.env.APPWRITE_MESSAGES_COLLECTION_ID, 
+            [
+                Query.equal("folder", [`${folder}`]),
+                Query.orderAsc('$updatedAt'),
+                Query.limit(1)
+            ]
+        );
+
+        if(getTotal.total === 0)
+        {
+            return 0;
+        }
+        
         const result = await db.listDocuments
         (
             process.env.APPWRITE_DATABASE_ID, 
@@ -108,10 +124,11 @@ async function evaFunction(channel, folder) {
             [
                 Query.equal("folder", [`${folder}`]),
                 Query.orderAsc('$updatedAt'),
-                Query.limit(5)
+                Query.limit((Math.ceil(getTotal.total / 2)))
             ]
         );
 
+        //Can't happen V
         if(result.total === 0)
         {
             return 0;
@@ -127,8 +144,10 @@ async function evaFunction(channel, folder) {
             {
                 folder: randomDocument.folder,
                 message: randomDocument.message,
-                seen: !randomDocument.seen
-            }
+                seen: !randomDocument.seen,
+                createdBy: randomDocument.createdBy
+            },
+            randomDocument.$permissions
         )
 
         response = `${randomDocumentMessage}`;
