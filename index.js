@@ -77,7 +77,7 @@ async function handleInteraction(interaction)
     catch(error)
     {
         //message = "I can't show that!";
-        //console.log(error);
+        console.error(error);
     }
     finally
     {
@@ -154,6 +154,7 @@ async function evaFunction(channel, folder) {
     }
     catch(error) 
     {
+        console.error(error);
         return 0;
     }
 }
@@ -260,7 +261,7 @@ async function reset()
         } 
         catch (error) 
         {
-            console.error("Error in presenceUpdate:", error);
+            console.error(error);
         }
     });
 
