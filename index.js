@@ -22,6 +22,9 @@ let client = new Client({
     ],
   });
 
+const db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
+
+
 let streamingMessages = {};
 
 //  console.log('Task runs at 5:30 AM Mountain Time');
@@ -42,7 +45,6 @@ async function handleInteraction(interaction)
 
 
         const { commandName, user, options } = interaction;
-        let db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
         //see if we exist
         const selfRegistered = await db.listDocuments(
@@ -73,6 +75,10 @@ async function handleInteraction(interaction)
             );
             message = `Added '${options.getString("message").trim()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
         }
+        else if(commandName === "echo")
+        {
+            message = options.getString("message");
+        }
     }
     catch(error)
     {
@@ -97,7 +103,6 @@ async function evaFunction(channel, folder) {
     let response = "";
     
     try {
-        let db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
         const getTotal = await db.listDocuments
         (
@@ -143,7 +148,7 @@ async function evaFunction(channel, folder) {
                 folder: randomDocument.folder,
                 message: randomDocument.message,
                 seen: !randomDocument.seen,
-                createdBy: randomDocument.createdBy
+                createdBy: randomDocument.createdBy || 'simok123'
             },
             randomDocument.$permissions
         )
