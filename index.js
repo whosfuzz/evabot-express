@@ -24,9 +24,6 @@ let client = new Client({
 
 let streamingMessages = {};
 
-const appwriteClient = new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY);
-const db = new Databases(appwriteClient);
-
 //  console.log('Task runs at 5:30 AM Mountain Time');
 cron.schedule('30 5 * * *', () => {
   streamingMessages = {};
@@ -45,6 +42,7 @@ async function handleInteraction(interaction)
 
 
         const { commandName, user, options } = interaction;
+        let db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
         //see if we exist
         const selfRegistered = await db.listDocuments(
@@ -54,15 +52,14 @@ async function handleInteraction(interaction)
                 Query.equal('discordUsername', [user.username])
             ]
         )
-
-        if(selfRegistered.documents.length === 0)
-        {
-            message = `Your account isn't registered. Click [here](https://discord.com/oauth2/authorize?response_type=code&client_id=1261843540665958531&state=%7B%22success%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22failure%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22token%22%3Afalse%7D&scope=identify+email&redirect_uri=https%3A%2F%2Ffra.cloud.appwrite.io%2Fv1%2Faccount%2Fsessions%2Foauth2%2Fcallback%2Fdiscord%2F669318be00330e837d7f) to get started`;
-            throw new Error(message);
-        }
-
         if(commandName === 'create')
         {
+            if(selfRegistered.documents.length === 0)
+            {
+                message = `Your account isn't registered. Click [here](https://discord.com/oauth2/authorize?response_type=code&client_id=1261843540665958531&state=%7B%22success%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22failure%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22token%22%3Afalse%7D&scope=identify+email&redirect_uri=https%3A%2F%2Ffra.cloud.appwrite.io%2Fv1%2Faccount%2Fsessions%2Foauth2%2Fcallback%2Fdiscord%2F669318be00330e837d7f) to get started`;
+                throw new Error(message);
+            }
+
             const result = await db.createDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, ID.unique(), 
             {
                 folder: options.getString("folder").trim().toLowerCase(),
@@ -100,6 +97,7 @@ async function evaFunction(channel, folder) {
     let response = "";
     
     try {
+        let db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
         const getTotal = await db.listDocuments
         (
