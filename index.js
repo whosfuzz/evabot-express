@@ -66,7 +66,7 @@ async function handleInteraction(interaction)
             const result = await db.createDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, ID.unique(), 
             {
                 folder: options.getString("folder").trim().toLowerCase(),
-                message: options.getString("message").trim().toLowerCase(),
+                message: options.getString("message").trim(),
                 seen: false, 
                 createdBy: user.username
             },
@@ -74,7 +74,7 @@ async function handleInteraction(interaction)
                 Permission.write(Role.user(selfRegistered.documents[0].$id))
             ]
             );
-            message = `Added '${options.getString("message").trim().toLowerCase()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
+            message = `Added '${options.getString("message").trim()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
         }
     }
     catch(error)
