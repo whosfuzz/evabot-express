@@ -119,7 +119,12 @@ async function evaFunction(channel, folder) {
         {
             return 0;
         }
-        
+        let defaultLimit = 2;
+        if(getTotal.total <= 2)
+        {
+            defaultLimit = 1;
+        }
+
         const result = await db.listDocuments
         (
             process.env.APPWRITE_DATABASE_ID, 
@@ -127,7 +132,7 @@ async function evaFunction(channel, folder) {
             [
                 Query.equal("folder", [`${folder}`]),
                 Query.orderAsc('$updatedAt'),
-                Query.limit((Math.ceil(getTotal.total / 2)))
+                Query.limit(defaultLimit)
             ]
         );
 
