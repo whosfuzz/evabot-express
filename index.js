@@ -24,13 +24,57 @@ let client = new Client({
 
 const db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
-
 let streamingMessages = {};
 
 //  console.log('Task runs at 5:30 AM Mountain Time');
 cron.schedule('30 5 * * *', () => {
   streamingMessages = {};
 }, { timezone: 'America/Denver'});
+
+cron.schedule('0 9 * * 1', async () => {
+  await dayOfWeek("Monday");
+}, { timezone: 'America/Denver' });
+
+cron.schedule('0 9 * * 2', async () => {
+  await dayOfWeek("Tuesday");
+}, { timezone: 'America/Denver' });
+
+cron.schedule('0 9 * * 5', async () => {
+  await dayOfWeek("Friday");
+}, { timezone: 'America/Denver' });
+
+cron.schedule('0 9 * * 6', async () => {
+  await dayOfWeek("Saturday");
+}, { timezone: 'America/Denver' });
+
+async function dayOfWeek(weekday) {
+  try {
+    const result = await db.listDocuments(
+      process.env.APPWRITE_DATABASE_ID,
+      process.env.APPWRITE_MESSAGES_COLLECTION_ID,
+      [
+        Query.startsWith('folder', weekday.charAt(0).toLowerCase()),
+        Query.limit(25),
+      ]
+    );
+
+    if (result.total > 0) {
+      const randomIndex = Math.floor(Math.random() * result.documents.length);
+      const doc = result.documents[randomIndex];
+      const folderName = doc.folder.charAt(0).toUpperCase() + doc.folder.slice(1);
+
+      const channel = await client.channels.fetch(process.env.DISCORD_GUILD_ID);
+
+      if (channel && channel.isTextBased()) {
+        await channel.send(`It's ${folderName} ${weekday}`);
+        await evaFunction(channel, doc.folder); 
+      }
+    }
+  } catch (error) {
+    console.error(`${weekday} message error:`, error);
+  }
+}
+
 
 async function handleInteraction(interaction) 
 {
@@ -46,16 +90,16 @@ async function handleInteraction(interaction)
 
         const { commandName, user, options } = interaction;
 
-        //see if we exist
-        const selfRegistered = await db.listDocuments(
-            process.env.APPWRITE_DATABASE_ID,
-            process.env.APPWRITE_USERS_COLLECTION_ID,
-            [
-                Query.equal('discordUsername', [user.username])
-            ]
-        )
         if(commandName === 'create')
         {
+            const selfRegistered = await db.listDocuments(
+                process.env.APPWRITE_DATABASE_ID,
+                process.env.APPWRITE_USERS_COLLECTION_ID,
+                [
+                    Query.equal('discordUsername', [user.username])
+                ]
+            )
+            
             if(selfRegistered.documents.length === 0)
             {
                 message = `Your account isn't registered. Click [here](https://discord.com/oauth2/authorize?response_type=code&client_id=1261843540665958531&state=%7B%22success%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22failure%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22token%22%3Afalse%7D&scope=identify+email&redirect_uri=https%3A%2F%2Ffra.cloud.appwrite.io%2Fv1%2Faccount%2Fsessions%2Foauth2%2Fcallback%2Fdiscord%2F669318be00330e837d7f) to get started`;
@@ -169,27 +213,32 @@ async function evaFunction(channel, folder) {
     }
 }
 
-async function showMe(split, channel)
-{
-    if (split.length > 1) 
-    {
-        const searchTerm = split[1].trim();
-        if (searchTerm.length > 0) 
-        {
-            const result = await evaFunction(channel, searchTerm);
+async function showMe(split, channel) {
+  if (split.length > 1) {
+    let searchTerm = split[1].trim();
+
+    if (searchTerm.length > 0) {
+      const result = await evaFunction(channel, searchTerm);
+
+      if (result === 0) {
+        try {
+          let sfw = true;
             
-            if (result === 0) 
-            {
-                try {
-                    const response = await getRandomImage(searchTerm);
-                    await channel.send(`${response}`);
-                } catch (error) {
-                    await channel.send("I can't show that!");
-                }
-            }
+          if (searchTerm.toLowerCase().startsWith("nsfw ")) {
+            sfw = false;
+            searchTerm = searchTerm.substring(5).trim();
+          }
+
+          const response = await getRandomImage(searchTerm, sfw);
+          await channel.send(`${response}`);
+        } catch (error) {
+          await channel.send("I can't show that!");
         }
+      }
     }
+  }
 }
+
 
 
 async function reset()
@@ -217,6 +266,7 @@ async function reset()
         {
             const evaMessage = await evaFunction(message.channel, "eva");
         }
+        else if(message.content.
     });
         
     client.on(Events.InteractionCreate, async interaction => {
