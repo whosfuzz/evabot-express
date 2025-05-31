@@ -75,16 +75,15 @@ async function dayOfWeek(weekday) {
   }
 }
 
-
 async function handleInteraction(interaction) {
     try {
         if (!interaction.isCommand()) return;
 
-        const { commandName, user, options } = interaction;
+        const { commandName, user, options, channel } = interaction;
 
         // Defer reply only if command is 'create' (because it might take time)
         if (commandName === 'create') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 }); // ephemeral defer
 
             // Check if user is registered
             const selfRegistered = await db.listDocuments(
@@ -95,7 +94,7 @@ async function handleInteraction(interaction) {
 
             if (selfRegistered.documents.length === 0) {
                 const message = `Your account isn't registered. Click [here](https://discord.com/oauth2/authorize?response_type=code&client_id=1261843540665958531&state=%7B%22success%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22failure%22%3A%22https%3A%5C%2F%5C%2Fevabot.pages.dev%5C%2F%22%2C%22token%22%3Afalse%7D&scope=identify+email&redirect_uri=https%3A%2F%2Ffra.cloud.appwrite.io%2Fv1%2Faccount%2Fsessions%2Foauth2%2Fcallback%2Fdiscord%2F669318be00330e837d7f) to get started`;
-                return await interaction.editReply({ content: message });
+                return await interaction.editReply({ content: message, flags: 64 }); // ephemeral edit reply
             }
 
             // Create document
@@ -113,22 +112,29 @@ async function handleInteraction(interaction) {
             );
 
             const successMsg = `Added '${options.getString("message").trim()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
-            return await interaction.editReply({ content: successMsg });
+            return await interaction.editReply({ content: successMsg, flags: 64 }); // ephemeral edit reply
         } 
         else if (commandName === "echo") {
-            // For echo, just send a fresh message as the bot
+
             const echoMessage = options.getString("message");
-            return await interaction.reply({ content: echoMessage, ephemeral: false });
-            // or use followUp if you already deferred
+
+            // Defer the reply so Discord doesn't complain, ephemeral
+            await interaction.deferReply({ flags: 64 });
+
+            // Send the actual message to the channel (not ephemeral)
+            await channel.send(echoMessage);
+
+            // Delete the deferred ephemeral reply so user sees nothing
+            await interaction.deleteReply();
         }
 
     } catch (error) {
         console.error(error);
         // If interaction was deferred, edit reply; else reply normally
         if (interaction.deferred || interaction.replied) {
-            await interaction.editReply({ content: "I can't show that!" });
+            await interaction.editReply({ content: "I can't show that!", flags: 64 });
         } else {
-            await interaction.reply({ content: "I can't show that!", ephemeral: true });
+            await interaction.reply({ content: "I can't show that!", flags: 64 });
         }
     }
 }
