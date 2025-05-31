@@ -266,7 +266,6 @@ async function reset()
         {
             const evaMessage = await evaFunction(message.channel, "eva");
         }
-        else if(message.content.
     });
         
     client.on(Events.InteractionCreate, async interaction => {
