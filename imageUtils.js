@@ -1,7 +1,7 @@
 // imageUtils.js
 import axios from 'axios'; 
 
-export async function getRandomImage(query, s = 'medium') {
+export async function getRandomImage(query, sfw = true) {
   const endpoint = 'https://customsearch.googleapis.com/customsearch/v1';
 
   const params = {
@@ -10,9 +10,9 @@ export async function getRandomImage(query, s = 'medium') {
     q: query,
     searchType: 'image',
     start: 1,
-    safe: s,
+    safe: sfw ? 'active' : 'off',
   };
-
+  
   try {
     const response = await axios.get(endpoint, { params });
     
