@@ -244,17 +244,24 @@ async function askEva(prompt, channel) {
     {
         return;
     }
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: `Respond to the following in a paragraph: ${prompt}`,
-      config: {
-          maxOutputTokens: 500,
-          temperature: 0.7, // More creative output
-          topP: 0.95,
-          topK: 40,
-      },
-    });
-    await channel.send(`${response.text}`);
+    try
+    {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: `Respond to the following in a paragraph: ${prompt}`,
+          config: {
+              maxOutputTokens: 500,
+              temperature: 0.7, // More creative output
+              topP: 0.95,
+              topK: 40,
+          },
+        });
+        await channel.send(`${response.text}`);
+    }
+    catch(err)
+    {
+        
+    }
     //console.log(response.text);
 }
 
@@ -279,9 +286,9 @@ async function reset()
             const split = message.content.toLowerCase().split(/show me /);
             showMe(split, message.channel);
         }
-        else if(message.content.toLowerCase().startsWith("eva"))
+        else if(message.content.toLowerCase().startsWith("eva,"))
         {
-            const split = message.content.toLowerCase().split("eva");
+            const split = message.content.toLowerCase().split("eva,");
             if (split.length > 1) 
             {
               let searchTerm = split[1].trim();
