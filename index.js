@@ -2,6 +2,8 @@
 import dotenv from 'dotenv'
 dotenv.config()
 
+import { GoogleGenAI } from "@google/genai";
+
 import cron from 'node-cron';
 
 import { Client, Events, GatewayIntentBits, ActivityType } from 'discord.js';
@@ -25,6 +27,8 @@ let client = new Client({
 const db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
 let streamingMessages = {};
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 //  console.log('Task runs at 5:30 AM Mountain Time');
 cron.schedule('30 5 * * *', () => {
@@ -234,7 +238,25 @@ async function showMe(split, channel) {
   }
 }
 
+async function askEva(prompt, channel) {
 
+    if(!prompt)
+    {
+        return;
+    }
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: `Respond to the following in a paragraph: ${prompt}`,
+      config: {
+          maxOutputTokens: 500,
+          temperature: 0.7, // More creative output
+          topP: 0.95,
+          topK: 40,
+      },
+    });
+    await channel.send(`${response.text}`);
+    //console.log(response.text);
+}
 
 async function reset()
 {    
@@ -257,7 +279,28 @@ async function reset()
             const split = message.content.toLowerCase().split(/show me /);
             showMe(split, message.channel);
         }
-        else if(message.content.toLowerCase().includes('eva'))
+        else if(message.content.toLowerCase().startsWith("eva"))
+        {
+            const split = message.content.toLowerCase().split("eva");
+            if (split.length > 1) 
+            {
+              let searchTerm = split[1].trim();
+
+              if (searchTerm.length > 0) 
+              {
+                const evaResponse = await askEva(searchTerm, message.channel);
+              }
+              else
+              {
+                const evaMessage = await evaFunction(message.channel, "eva");
+              }
+            }
+            else
+            {
+              const evaMessage = await evaFunction(message.channel, "eva");
+            }
+        }
+        else if(message.content.toLowerCase().includes("eva"))
         {
             const evaMessage = await evaFunction(message.channel, "eva");
         }
