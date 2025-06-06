@@ -2,11 +2,11 @@
 import dotenv from 'dotenv'
 dotenv.config()
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 import cron from 'node-cron';
 
-import { Client, Events, GatewayIntentBits, ActivityType } from 'discord.js';
+import  { Client, Events, GatewayIntentBits, ActivityType, AttachmentBuilder } from 'discord.js';
 import { Client as AppwriteClient, Users, Databases, Query, Permission, Role, ID } from 'node-appwrite';
 import { getRandomImage } from './imageUtils.js';
 
@@ -260,9 +260,40 @@ async function askEva(prompt, channel) {
     }
     catch(err)
     {
-        
+      await channel.send("I can't show that!");
     }
     //console.log(response.text);
+}
+
+async function evaImagine(prompt, channel) {
+    const contents = prompt;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash-preview-image-generation",
+            contents: contents,
+            config: {
+                responseModalities: [Modality.TEXT, Modality.IMAGE],
+            },
+        });
+
+        // Loop through the response to find image data
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const imageData = part.inlineData.data;
+                const buffer = Buffer.from(imageData, "base64");
+
+                // Create a MessageAttachment from the buffer
+                const attachment = new AttachmentBuilder(buffer, { name: ID.unique() + ".png", contentType: 'image/png'});
+
+                // Send the image attachment to the channel
+                await channel.send({ files: [attachment] });
+            }
+        }
+    } catch (err) {
+      console.log(err);
+        await channel.send("I can't show that!");
+    }
 }
 
 async function reset()
@@ -285,6 +316,28 @@ async function reset()
         {
             const split = message.content.toLowerCase().split(/show me /);
             showMe(split, message.channel);
+        }
+        else if(message.content.toLowerCase().startsWith("eva, imagine"))
+        {
+            const split = message.content.toLowerCase().split("eva, imagine");
+            if (split.length > 1) 
+            {
+              let searchTerm = split[1].trim();
+
+              if (searchTerm.length > 0) 
+              {
+                const evaResponse = await evaImagine(searchTerm, message.channel);
+              }
+              else
+              {
+                const evaMessage = await evaFunction(message.channel, "eva");
+              }
+            }
+            else
+            {
+              const evaMessage = await evaFunction(message.channel, "eva");
+            }
+
         }
         else if(message.content.toLowerCase().startsWith("eva,"))
         {
