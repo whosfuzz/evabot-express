@@ -316,9 +316,9 @@ async function reset()
             const split = message.content.toLowerCase().split(/show me /);
             showMe(split, message.channel);
         }
-        else if (message.content.toLowerCase().startsWith("lacked, imagine")) 
+        else if (message.content.toLowerCase().startsWith("evabot, imagine")) 
         {
-          const split = message.content.toLowerCase().split("lacked, imagine");
+          const split = message.content.toLowerCase().split("evabot, imagine");
           let searchTerm = split[1]?.trim() || "";
 
           const attachments = message.attachments;
@@ -386,9 +386,9 @@ async function reset()
                   await evaFunction(message.channel, "eva");
               }
           }
-        else if(message.content.toLowerCase().startsWith("lacked,"))
+        else if(message.content.toLowerCase().startsWith("evabot,"))
         {
-            const split = message.content.toLowerCase().split("lacked,");
+            const split = message.content.toLowerCase().split("evabot,");
             if (split.length > 1) 
             {
               let searchTerm = split[1].trim();
