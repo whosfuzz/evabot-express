@@ -1,4 +1,3 @@
-
 import dotenv from 'dotenv'
 dotenv.config()
 
@@ -317,28 +316,76 @@ async function reset()
             const split = message.content.toLowerCase().split(/show me /);
             showMe(split, message.channel);
         }
-        else if(message.content.toLowerCase().startsWith("eva, imagine"))
+        else if (message.content.toLowerCase().startsWith("eva, imagine")) 
         {
-            const split = message.content.toLowerCase().split("eva, imagine");
-            if (split.length > 1) 
-            {
-              let searchTerm = split[1].trim();
+          const split = message.content.toLowerCase().split("eva, imagine");
+          let searchTerm = split[1]?.trim() || "";
 
-              if (searchTerm.length > 0) 
-              {
-                const evaResponse = await evaImagine(searchTerm, message.channel);
-              }
-              else
-              {
-                const evaMessage = await evaFunction(message.channel, "eva");
-              }
-            }
-            else
-            {
-              const evaMessage = await evaFunction(message.channel, "eva");
-            }
+          const attachments = message.attachments;
 
-        }
+          // If there are image attachments, convert them to base64 and include them
+          if (attachments.size > 0) {
+              const firstAttachment = attachments.first();
+              if (firstAttachment && firstAttachment.contentType?.startsWith('image/')) {
+                  try {
+                      const response = await fetch(firstAttachment.url);
+                      const buffer = await response.arrayBuffer();
+                      const base64Image = Buffer.from(buffer).toString('base64');
+
+                      const geminiResponse = await ai.models.generateContent({
+                          model: "gemini-2.0-flash-preview-image-generation",
+                          contents: [
+                              {
+                                  role: "user",
+                                  parts: [
+                                      { text: searchTerm || "Imagine this..." },
+                                      {
+                                          inlineData: {
+                                              mimeType: firstAttachment.contentType,
+                                              data: base64Image
+                                          }
+                                      }
+                                  ]
+                              }
+                          ],
+                          config: {
+                              responseModalities: [Modality.TEXT, Modality.IMAGE],
+                          },
+                      });
+
+                      for (const part of geminiResponse.candidates[0].content.parts) {
+                          if (part.inlineData) {
+                              const imageData = part.inlineData.data;
+                              const buffer = Buffer.from(imageData, "base64");
+
+                              const attachment = new AttachmentBuilder(buffer, {
+                                  name: ID.unique() + ".png",
+                                  contentType: 'image/png'
+                              });
+
+                              await message.channel.send({ files: [attachment] });
+                          }
+                      }
+                  } catch (error) {
+                      console.error("Error processing image attachment:", error);
+                      await message.channel.send("Sorry, I couldn't process the image.");
+                  }
+              } else {
+                if (searchTerm.length > 0) 
+                {
+                  const evaResponse = await evaImagine(searchTerm, message.channel);
+                }
+                else
+                {
+                  const evaMessage = await evaFunction(message.channel, "eva");
+                }
+              }
+          } else if (searchTerm.length > 0) {
+              await evaImagine(searchTerm, message.channel);
+          } else {
+              await evaFunction(message.channel, "eva");
+          }
+      }
         else if(message.content.toLowerCase().startsWith("eva,"))
         {
             const split = message.content.toLowerCase().split("eva,");
