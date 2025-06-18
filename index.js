@@ -35,7 +35,7 @@ cron.schedule('30 5 * * *', () => {
 }, { timezone: 'America/Denver'});
 
 cron.schedule('0 9 * * 0', async () => {
-  await dayOfWeek("Sunday);
+  await dayOfWeek("Sunday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 1', async () => {
