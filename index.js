@@ -34,6 +34,10 @@ cron.schedule('30 5 * * *', () => {
   streamingMessages = {};
 }, { timezone: 'America/Denver'});
 
+cron.schedule('0 9 * * 0', async () => {
+  await dayOfWeek("Sunday);
+}, { timezone: 'America/Denver' });
+
 cron.schedule('0 9 * * 1', async () => {
   await dayOfWeek("Monday");
 }, { timezone: 'America/Denver' });
@@ -57,6 +61,7 @@ async function dayOfWeek(weekday) {
       process.env.APPWRITE_MESSAGES_COLLECTION_ID,
       [
         Query.startsWith('folder', weekday.charAt(0).toLowerCase()),
+        Query.orderAsc('$updatedAt'),
         Query.limit(25),
       ]
     );
@@ -154,7 +159,7 @@ async function evaFunction(channel, folder) {
             [
                 Query.equal("folder", [`${folder}`]),
                 Query.orderAsc('$updatedAt'),
-                Query.limit(1)
+                Query.limit(25)
             ]
         );
 
@@ -185,11 +190,32 @@ async function evaFunction(channel, folder) {
             return 0;
         }
 
-        const documents = result.documents;
+        let documents = result.documents;
 
         const randomIndex = Math.floor(Math.random() * documents.length);
-        const randomDocument = documents[randomIndex];
-        const randomDocumentMessage = randomDocument.message;
+        let randomDocument = documents[randomIndex];
+        let randomDocumentMessage = randomDocument.message;
+
+        let recentlyAddedDocuments = [];
+        for(let i = 0; i < getTotal.documents.length; i++)
+        {
+            if(getTotal.documents[i].$updatedAt === getTotal.documents[i].$createdAt)
+            {
+                recentlyAddedDocuments.push(getTotal.documents[i]);
+            }
+        }
+        
+        if(recentlyAddedDocuments.length > 0)
+        {
+            const randomRecentlyIndex = Math.floor(Math.random() * recentlyAddedDocuments.length);
+            const randomRecentlyDocument = recentlyAddedDocuments[randomRecentlyIndex];
+            const randomRecentlyDocumentMessage = randomRecentlyDocument.message;
+
+            if (Math.random() < 0.8) {
+                randomDocument = randomRecentlyDocument;
+                randomDocumentMessage = randomRecentlyDocumentMessage;
+            }
+        }
 
         await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, randomDocument.$id, 
             {
