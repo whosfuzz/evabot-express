@@ -158,7 +158,7 @@ async function evaFunction(channel, folder) {
             process.env.APPWRITE_MESSAGES_COLLECTION_ID, 
             [
                 Query.equal("folder", [`${folder}`]),
-                Query.orderAsc('$updatedAt'),
+                Query.orderDesc('$updatedAt'),
                 Query.limit(25)
             ]
         );
