@@ -26,12 +26,14 @@ let client = new Client({
 const db = new Databases(new AppwriteClient().setEndpoint(process.env.APPWRITE_ENDPOINT).setProject(process.env.APPWRITE_PROJECT_ID).setKey(process.env.APPWRITE_API_KEY));
 
 let streamingMessages = {};
+let allMessages = [];
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 //  console.log('Task runs at 5:30 AM Mountain Time');
 cron.schedule('30 5 * * *', () => {
   streamingMessages = {};
+  allMessages = [];
 }, { timezone: 'America/Denver'});
 
 cron.schedule('0 9 * * 0', async () => {
@@ -56,13 +58,13 @@ cron.schedule('0 9 * * 6', async () => {
 
 async function dayOfWeek(weekday) {
   try {
+
     const result = await db.listDocuments(
       process.env.APPWRITE_DATABASE_ID,
       process.env.APPWRITE_MESSAGES_COLLECTION_ID,
       [
         Query.startsWith('folder', weekday.charAt(0).toLowerCase()),
         Query.orderAsc('$updatedAt'),
-        Query.limit(25),
       ]
     );
 
@@ -159,18 +161,12 @@ async function evaFunction(channel, folder) {
             [
                 Query.equal("folder", [`${folder}`]),
                 Query.orderDesc('$updatedAt'),
-                Query.limit(25)
             ]
         );
 
         if(getTotal.total === 0)
         {
             return 0;
-        }
-        let defaultLimit = 2;
-        if(getTotal.total <= 2)
-        {
-            defaultLimit = 1;
         }
 
         const result = await db.listDocuments
@@ -180,7 +176,7 @@ async function evaFunction(channel, folder) {
             [
                 Query.equal("folder", [`${folder}`]),
                 Query.orderAsc('$updatedAt'),
-                Query.limit(defaultLimit)
+                Query.limit(2)
             ]
         );
 
@@ -326,6 +322,8 @@ async function reset()
     
     client.on(Events.MessageCreate, async message => { 
         if (message.author.bot) return;
+
+        allMessages.push(`${message.author.username}: ${message.content}`);
 
         if (message.content.toLowerCase().includes('show me an ') || message.content.toLowerCase().includes('show me the ')) 
         {
@@ -504,6 +502,10 @@ await reset();
 
 app.get('/', (req, res) => {
     res.json(streamingMessages);
+});
+
+app.get('/messages', (req, res) => {
+    res.json(allMessages);
 });
 
 app.listen(port, () => {
