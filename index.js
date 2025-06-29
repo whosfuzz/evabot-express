@@ -65,6 +65,7 @@ async function dayOfWeek(weekday) {
       [
         Query.startsWith('folder', weekday.charAt(0).toLowerCase()),
         Query.orderAsc('$updatedAt'),
+        Query.limit(5000)
       ]
     );
 
