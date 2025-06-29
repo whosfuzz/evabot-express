@@ -58,7 +58,6 @@ cron.schedule('0 9 * * 6', async () => {
 
 async function dayOfWeek(weekday) {
   try {
-
     const result = await db.listDocuments(
       process.env.APPWRITE_DATABASE_ID,
       process.env.APPWRITE_MESSAGES_COLLECTION_ID,
@@ -70,21 +69,40 @@ async function dayOfWeek(weekday) {
     );
 
     if (result.total > 0) {
-      const randomIndex = Math.floor(Math.random() * result.documents.length);
-      const doc = result.documents[randomIndex];
-      const folderName = doc.folder.charAt(0).toUpperCase() + doc.folder.slice(1);
+      // Step 1: Group documents by folder name
+      const groupedFolders = result.documents.reduce((acc, doc) => {
+        const folderName = doc.folder; // assuming `folder` is the field name
+        if (!acc[folderName]) {
+          acc[folderName] = [];
+        }
+        acc[folderName].push(doc);
+        return acc;
+      }, {});
 
+      // Step 2: Randomly pick one document from each folder group
+      const selectedDocs = Object.keys(groupedFolders).map(folderName => {
+        const folderDocs = groupedFolders[folderName];
+        const randomDoc = folderDocs[Math.floor(Math.random() * folderDocs.length)];
+        return randomDoc;
+      });
+
+      // Step 3: Randomly select one document from the selectedDocs array
+      const randomDoc = selectedDocs[Math.floor(Math.random() * selectedDocs.length)];
+      const folderName = randomDoc.folder.charAt(0).toUpperCase() + randomDoc.folder.slice(1);
+
+      // Step 4: Fetch the Discord channel and send the message
       const channel = await client.channels.fetch(process.env.DISCORD_GUILD_ID);
 
       if (channel && channel.isTextBased()) {
         await channel.send(`It's ${folderName} ${weekday}`);
-        await evaFunction(channel, doc.folder); 
+        await evaFunction(channel, randomDoc.folder); 
       }
     }
   } catch (error) {
     console.error(`${weekday} message error:`, error);
   }
 }
+
 
 async function handleInteraction(interaction) {
     try {
@@ -208,7 +226,7 @@ async function evaFunction(channel, folder) {
             const randomRecentlyDocument = recentlyAddedDocuments[randomRecentlyIndex];
             const randomRecentlyDocumentMessage = randomRecentlyDocument.message;
 
-            if (Math.random() < 0.8) {
+            if (Math.random() < 0.5) {
                 randomDocument = randomRecentlyDocument;
                 randomDocumentMessage = randomRecentlyDocumentMessage;
             }
