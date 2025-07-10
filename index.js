@@ -49,11 +49,11 @@ cron.schedule('0 9 * * 2', async () => {
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 3', async () => {
-  await dayOfWeek("");
+  await dayOfWeek("Wednesday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 4', async () => {
-  await dayOfWeek("");
+  await dayOfWeek("Thursday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 5', async () => {
@@ -69,7 +69,7 @@ async function dayOfWeek(weekday) {
       let queries = [];
       queries.push(Query.orderAsc('$updatedAt'));
       queries.push(Query.limit(5000));
-      if(weekday.length > 0)
+      if(weekday !== "Wednesday" && weekday !== "Thursday")
       {
         queries.push(Query.startsWith('folder', weekday.charAt(0).toLowerCase()));
       }
