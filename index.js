@@ -48,6 +48,14 @@ cron.schedule('0 9 * * 2', async () => {
   await dayOfWeek("Tuesday");
 }, { timezone: 'America/Denver' });
 
+cron.schedule('0 9 * * 3', async () => {
+  await dayOfWeek("");
+}, { timezone: 'America/Denver' });
+
+cron.schedule('0 9 * * 4', async () => {
+  await dayOfWeek("");
+}, { timezone: 'America/Denver' });
+
 cron.schedule('0 9 * * 5', async () => {
   await dayOfWeek("Friday");
 }, { timezone: 'America/Denver' });
@@ -58,14 +66,18 @@ cron.schedule('0 9 * * 6', async () => {
 
 async function dayOfWeek(weekday) {
   try {
+      let queries = [];
+      queries.push(Query.orderAsc('$updatedAt'));
+      queries.push(Query.limit(5000));
+      if(weekday.length > 0)
+      {
+        queries.push(Query.startsWith('folder', weekday.charAt(0).toLowerCase()));
+      }
+      
     const result = await db.listDocuments(
       process.env.APPWRITE_DATABASE_ID,
       process.env.APPWRITE_MESSAGES_COLLECTION_ID,
-      [
-        Query.startsWith('folder', weekday.charAt(0).toLowerCase()),
-        Query.orderAsc('$updatedAt'),
-        Query.limit(5000)
-      ]
+      queries
     );
 
     if (result.total > 0) {
