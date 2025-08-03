@@ -66,41 +66,33 @@ cron.schedule('0 9 * * 6', async () => {
 
 async function dayOfWeek(weekday) {
   try {
-      let queries = [];
-      queries.push(Query.orderAsc('$updatedAt'));
-      queries.push(Query.limit(5000));
-      if(weekday !== "Wednesday" && weekday !== "Thursday")
-      {
-        queries.push(Query.startsWith('folder', weekday.charAt(0).toLowerCase()));
-      }
-      
+    let queries = [];
+
+    if(weekday !== "Wednesday" && weekday !== "Thursday")
+    {
+      queries.push(Query.startsWith('folder', weekday.charAt(0).toLowerCase()));
+    }
+    
+    queries.push(Query.orderAsc('$updatedAt'));
+    queries.push(Query.limit(2));
+
     const result = await db.listDocuments(
       process.env.APPWRITE_DATABASE_ID,
-      process.env.APPWRITE_MESSAGES_COLLECTION_ID,
+      process.env.APPWRITE_FOLDERS_COLLECTION_ID,
       queries
     );
 
     if (result.total > 0) {
-      // Step 1: Group documents by folder name
-      const groupedFolders = result.documents.reduce((acc, doc) => {
-        const folderName = doc.folder; // assuming `folder` is the field name
-        if (!acc[folderName]) {
-          acc[folderName] = [];
-        }
-        acc[folderName].push(doc);
-        return acc;
-      }, {});
 
-      // Step 2: Randomly pick one document from each folder group
-      const selectedDocs = Object.keys(groupedFolders).map(folderName => {
-        const folderDocs = groupedFolders[folderName];
-        const randomDoc = folderDocs[Math.floor(Math.random() * folderDocs.length)];
-        return randomDoc;
-      });
+      let documents = result.documents;
 
-      // Step 3: Randomly select one document from the selectedDocs array
-      const randomDoc = selectedDocs[Math.floor(Math.random() * selectedDocs.length)];
-      const folderName = randomDoc.folder.charAt(0).toUpperCase() + randomDoc.folder.slice(1);
+      const randomIndex = Math.floor(Math.random() * documents.length);
+      const randomDoc = documents[randomIndex];
+      const folderName = randomDoc.folder
+        .trim()
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 
       // Step 4: Fetch the Discord channel and send the message
       const channel = await client.channels.fetch(process.env.DISCORD_GUILD_ID);
@@ -151,6 +143,8 @@ async function handleInteraction(interaction) {
                 },
                 [Permission.write(Role.user(selfRegistered.documents[0].$id))]
             );
+
+            await updateFolder(options.getString("folder").trim().toLowerCase());
 
             const successMsg = `Added '${options.getString("message").trim()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
             return await interaction.editReply({ content: successMsg, flags: 64 }); // ephemeral edit reply
@@ -211,12 +205,6 @@ async function evaFunction(channel, folder) {
             ]
         );
 
-        //Can't happen V
-        if(result.total === 0)
-        {
-            return 0;
-        }
-
         let documents = result.documents;
 
         const randomIndex = Math.floor(Math.random() * documents.length);
@@ -252,7 +240,9 @@ async function evaFunction(channel, folder) {
                 createdBy: randomDocument.createdBy || 'simok123'
             },
             randomDocument.$permissions
-        )
+        );
+
+        await updateFolder(folder);
 
         response = `${randomDocumentMessage}`;
         await channel.send(`${response}`);
@@ -262,6 +252,37 @@ async function evaFunction(channel, folder) {
     {
         console.error(error);
         return 0;
+    }
+}
+
+async function updateFolder(folderToUpdate)
+{
+    const getFoldersDoc = await db.listDocuments
+    (
+        process.env.APPWRITE_DATABASE_ID, 
+        process.env.APPWRITE_FOLDERS_COLLECTION_ID, 
+        [
+            Query.equal("folder", [`${folderToUpdate}`]),
+            Query.limit(1)
+        ]
+    );
+
+    if(getFoldersDoc.total > 0)
+    {
+      await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_FOLDERS_COLLECTION_ID, getFoldersDoc.documents[0].$id,
+        {
+          folder: getFoldersDoc.documents[0].folder,
+          seen: !getFoldersDoc.documents[0].seen,
+        });
+    }
+    else
+    {
+      await db.createDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_FOLDERS_COLLECTION_ID, ID.unique(),
+        {
+          folder: folderToUpdate,
+          seen: false
+        }
+      );
     }
 }
 
