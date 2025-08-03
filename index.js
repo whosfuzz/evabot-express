@@ -64,7 +64,7 @@ cron.schedule('0 9 * * 6', async () => {
   await dayOfWeek("Saturday");
 }, { timezone: 'America/Denver' });
 
-async function dayOfWeek(weekday) {
+async function dayOfWeek(weekday, depth = 0) {
   try {
     let queries = [];
 
@@ -83,11 +83,37 @@ async function dayOfWeek(weekday) {
     );
 
     if (result.total > 0) {
-
+        
       let documents = result.documents;
 
       const randomIndex = Math.floor(Math.random() * documents.length);
       const randomDoc = documents[randomIndex];
+
+    //See if we even have a message
+    const messageCheck = await db.listDocuments(
+      process.env.APPWRITE_DATABASE_ID,
+      process.env.APPWRITE_MESSAGES_COLLECTION_ID,
+        [
+            Query.limit(1), 
+            Query.equal("folder", randomDoc.folder)
+        ]
+    );
+
+    if(messageCheck.total === 0)
+    {
+        await deleteDocument(
+            process.env.APPWRITE_DATABASE_ID,
+            process.env.APPWRITE_FOLDERS_COLLECTION_ID,
+            result.documents[0].$id
+        );   
+        if (depth > 3) 
+        {
+            return;
+        }
+        await dayOfWeek(weekday, depth + 1);
+    }
+    //end of see if we even have a message
+
       const folderName = randomDoc.folder
         .trim()
         .split(/\s+/)
