@@ -37,31 +37,31 @@ cron.schedule('30 5 * * *', () => {
 }, { timezone: 'America/Denver'});
 
 cron.schedule('0 9 * * 0', async () => {
-  await dayOfWeek("Sunday");
+  //await dayOfWeek("Sunday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 1', async () => {
-  await dayOfWeek("Monday");
+  //await dayOfWeek("Monday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 2', async () => {
-  await dayOfWeek("Tuesday");
+  //await dayOfWeek("Tuesday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 3', async () => {
-  await dayOfWeek("Wednesday");
+  //await dayOfWeek("Wednesday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 4', async () => {
-  await dayOfWeek("Thursday");
+  //await dayOfWeek("Thursday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 5', async () => {
-  await dayOfWeek("Friday");
+  //await dayOfWeek("Friday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 6', async () => {
-  await dayOfWeek("Saturday");
+  //await dayOfWeek("Saturday");
 }, { timezone: 'America/Denver' });
 
 async function dayOfWeek(weekday, depth = 0) {
@@ -78,7 +78,7 @@ async function dayOfWeek(weekday, depth = 0) {
 
     const result = await db.listDocuments(
       process.env.APPWRITE_DATABASE_ID,
-      process.env.APPWRITE_FOLDERS_COLLECTION_ID,
+      process.env.APPWRITE_MESSAGES_COLLECTION_ID,
       queries
     );
 
@@ -88,31 +88,6 @@ async function dayOfWeek(weekday, depth = 0) {
 
       const randomIndex = Math.floor(Math.random() * documents.length);
       const randomDoc = documents[randomIndex];
-
-    //See if we even have a message
-    const messageCheck = await db.listDocuments(
-      process.env.APPWRITE_DATABASE_ID,
-      process.env.APPWRITE_MESSAGES_COLLECTION_ID,
-        [
-            Query.limit(1), 
-            Query.equal("folder", randomDoc.folder)
-        ]
-    );
-
-    if(messageCheck.total === 0)
-    {
-        await deleteDocument(
-            process.env.APPWRITE_DATABASE_ID,
-            process.env.APPWRITE_FOLDERS_COLLECTION_ID,
-            result.documents[0].$id
-        );   
-        if (depth > 3) 
-        {
-            return;
-        }
-        await dayOfWeek(weekday, depth + 1);
-    }
-    //end of see if we even have a message
 
       const folderName = randomDoc.folder
         .trim()
@@ -169,9 +144,7 @@ async function handleInteraction(interaction) {
                 },
                 [Permission.write(Role.user(selfRegistered.documents[0].$id))]
             );
-
-            await updateFolder(options.getString("folder").trim().toLowerCase());
-
+            
             const successMsg = `Added '${options.getString("message").trim()}' to [${options.getString("folder").trim().toLowerCase()}] successfully`;
             return await interaction.editReply({ content: successMsg, flags: 64 }); // ephemeral edit reply
         } 
@@ -204,22 +177,6 @@ async function evaFunction(channel, folder) {
     let response = "";
     
     try {
-
-        const getTotal = await db.listDocuments
-        (
-            process.env.APPWRITE_DATABASE_ID, 
-            process.env.APPWRITE_MESSAGES_COLLECTION_ID, 
-            [
-                Query.equal("folder", [`${folder}`]),
-                Query.orderDesc('$updatedAt'),
-            ]
-        );
-
-        if(getTotal.total === 0)
-        {
-            return 0;
-        }
-
         const result = await db.listDocuments
         (
             process.env.APPWRITE_DATABASE_ID, 
@@ -231,32 +188,16 @@ async function evaFunction(channel, folder) {
             ]
         );
 
+        if(result.total === 0)
+        {
+            return 0;
+        }
+
         let documents = result.documents;
 
         const randomIndex = Math.floor(Math.random() * documents.length);
         let randomDocument = documents[randomIndex];
         let randomDocumentMessage = randomDocument.message;
-
-        let recentlyAddedDocuments = [];
-        for(let i = 0; i < getTotal.documents.length; i++)
-        {
-            if(getTotal.documents[i].$updatedAt === getTotal.documents[i].$createdAt)
-            {
-                recentlyAddedDocuments.push(getTotal.documents[i]);
-            }
-        }
-        
-        if(recentlyAddedDocuments.length > 0)
-        {
-            const randomRecentlyIndex = Math.floor(Math.random() * recentlyAddedDocuments.length);
-            const randomRecentlyDocument = recentlyAddedDocuments[randomRecentlyIndex];
-            const randomRecentlyDocumentMessage = randomRecentlyDocument.message;
-
-            if (Math.random() < 0.5) {
-                randomDocument = randomRecentlyDocument;
-                randomDocumentMessage = randomRecentlyDocumentMessage;
-            }
-        }
 
         await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, randomDocument.$id, 
             {
@@ -267,8 +208,6 @@ async function evaFunction(channel, folder) {
             },
             randomDocument.$permissions
         );
-
-        await updateFolder(folder);
 
         response = `${randomDocumentMessage}`;
         await channel.send(`${response}`);
@@ -281,36 +220,6 @@ async function evaFunction(channel, folder) {
     }
 }
 
-async function updateFolder(folderToUpdate)
-{
-    const getFoldersDoc = await db.listDocuments
-    (
-        process.env.APPWRITE_DATABASE_ID, 
-        process.env.APPWRITE_FOLDERS_COLLECTION_ID, 
-        [
-            Query.equal("folder", [`${folderToUpdate}`]),
-            Query.limit(1)
-        ]
-    );
-
-    if(getFoldersDoc.total > 0)
-    {
-      await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_FOLDERS_COLLECTION_ID, getFoldersDoc.documents[0].$id,
-        {
-          folder: getFoldersDoc.documents[0].folder,
-          seen: !getFoldersDoc.documents[0].seen,
-        });
-    }
-    else
-    {
-      await db.createDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_FOLDERS_COLLECTION_ID, ID.unique(),
-        {
-          folder: folderToUpdate,
-          seen: false
-        }
-      );
-    }
-}
 
 async function showMe(split, channel) {
   if (split.length > 1) {
@@ -418,9 +327,9 @@ async function reset()
             const split = message.content.toLowerCase().split(/show me /);
             showMe(split, message.channel);
         }
-        else if (message.content.toLowerCase().startsWith("evabot, imagine")) 
+        else if (message.content.toLowerCase().startsWith("eva, imagine")) 
         {
-          const split = message.content.toLowerCase().split("evabot, imagine");
+          const split = message.content.toLowerCase().split("eva, imagine");
           let searchTerm = split[1]?.trim() || "";
 
           const attachments = message.attachments;
@@ -488,9 +397,9 @@ async function reset()
                   await evaFunction(message.channel, "eva");
               }
           }
-        else if(message.content.toLowerCase().startsWith("evabot,"))
+        else if(message.content.toLowerCase().startsWith("eva,"))
         {
-            const split = message.content.toLowerCase().split("evabot,");
+            const split = message.content.toLowerCase().split("eva,");
             if (split.length > 1) 
             {
               let searchTerm = split[1].trim();
