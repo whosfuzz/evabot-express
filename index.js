@@ -139,7 +139,7 @@ async function handleInteraction(interaction) {
                 {
                     folder: options.getString("folder").trim().toLowerCase(),
                     message: options.getString("message").trim(),
-                    seen: false,
+                    seen: null,
                     createdBy: user.username
                 },
                 [Permission.write(Role.user(selfRegistered.documents[0].$id))]
@@ -183,8 +183,8 @@ async function evaFunction(channel, folder) {
             process.env.APPWRITE_MESSAGES_COLLECTION_ID, 
             [
                 Query.equal("folder", [`${folder}`]),
-                Query.orderAsc('$updatedAt'),
-                Query.limit(2)
+                Query.orderAsc('seen'),
+                Query.limit(1)
             ]
         );
 
@@ -193,23 +193,19 @@ async function evaFunction(channel, folder) {
             return 0;
         }
 
-        let documents = result.documents;
-
-        const randomIndex = Math.floor(Math.random() * documents.length);
-        let randomDocument = documents[randomIndex];
-        let randomDocumentMessage = randomDocument.message;
+        let randomDocument = result.documents[0];
 
         await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_MESSAGES_COLLECTION_ID, randomDocument.$id, 
             {
                 folder: randomDocument.folder,
                 message: randomDocument.message,
-                seen: !randomDocument.seen,
+                seen: new Date().toISOString(),
                 createdBy: randomDocument.createdBy || 'simok123'
             },
             randomDocument.$permissions
         );
 
-        response = `${randomDocumentMessage}`;
+        response = `${randomDocument.message}`;
         await channel.send(`${response}`);
         return 1;
     }
