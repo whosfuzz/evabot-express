@@ -37,73 +37,78 @@ cron.schedule('30 5 * * *', () => {
 }, { timezone: 'America/Denver'});
 
 cron.schedule('0 9 * * 0', async () => {
-  //await dayOfWeek("Sunday");
+  await dayOfWeek("Sunday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 1', async () => {
-  //await dayOfWeek("Monday");
+  await dayOfWeek("Monday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 2', async () => {
-  //await dayOfWeek("Tuesday");
+  await dayOfWeek("Tuesday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 3', async () => {
-  //await dayOfWeek("Wednesday");
+  await dayOfWeek("Wednesday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 4', async () => {
-  //await dayOfWeek("Thursday");
+  await dayOfWeek("Thursday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 5', async () => {
-  //await dayOfWeek("Friday");
+  await dayOfWeek("Friday");
 }, { timezone: 'America/Denver' });
 
 cron.schedule('0 9 * * 6', async () => {
-  //await dayOfWeek("Saturday");
+  await dayOfWeek("Saturday");
 }, { timezone: 'America/Denver' });
 
 async function dayOfWeek(weekday, depth = 0) {
   try {
-    let queries = [];
-
-    if(weekday !== "Wednesday" && weekday !== "Thursday")
-    {
-      queries.push(Query.startsWith('folder', weekday.charAt(0).toLowerCase()));
-    }
-    
-    queries.push(Query.orderAsc('$updatedAt'));
-    queries.push(Query.limit(2));
-
-    const result = await db.listDocuments(
-      process.env.APPWRITE_DATABASE_ID,
-      process.env.APPWRITE_MESSAGES_COLLECTION_ID,
-      queries
-    );
-
-    if (result.total > 0) {
+        let queries = [];
         
-      let documents = result.documents;
+        const result = await db.listDocuments
+        (
+            process.env.APPWRITE_DATABASE_ID, 
+            process.env.APPWRITE_FOLDERS_COLLECTION_ID, 
+            [
+                Query.equal("weekday", [`${weekday}`]),
+                Query.orderAsc('seen'),
+                Query.limit(1)
+            ]
+        );
+        
+        if(result.total === 0)
+        {
+            return 0;
+        }
+        
+        let randomDocument = result.documents[0];
 
-      const randomIndex = Math.floor(Math.random() * documents.length);
-      const randomDoc = documents[randomIndex];
+        await db.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_FOLDERS_COLLECTION_ID, randomDocument.$id, 
+            {
+                folder: randomDocument.folder,
+                weekday: randomDocument.weekday,
+                seen: new Date().toISOString()
+            }
+        );
 
-      const folderName = randomDoc.folder
+        const folderName = randomDocument.folder
         .trim()
         .split(/\s+/)
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-
-      // Step 4: Fetch the Discord channel and send the message
-      const channel = await client.channels.fetch(process.env.DISCORD_GUILD_ID);
-
-      if (channel && channel.isTextBased()) {
-        await channel.send(`It's ${folderName} ${weekday}`);
-        await evaFunction(channel, randomDoc.folder); 
-      }
-    }
-  } catch (error) {
+        
+        // Step 4: Fetch the Discord channel and send the message
+        const channel = await client.channels.fetch(process.env.DISCORD_GUILD_ID);
+        
+        if (channel && channel.isTextBased()) {
+            await channel.send(`It's ${folderName} ${weekday}`);
+            await evaFunction(channel, randomDocument.folder); 
+        }
+  } 
+  catch (error) {
     console.error(`${weekday} message error:`, error);
   }
 }
